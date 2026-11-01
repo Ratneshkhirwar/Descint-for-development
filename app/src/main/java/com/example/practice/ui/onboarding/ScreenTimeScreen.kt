@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import com.example.practice.R
+import com.example.practice.ui.theme.AppPageHorizontalMargin
 import com.example.practice.ui.theme.DescintOrange
 import com.example.practice.ui.theme.DescintWhite
 import com.example.practice.ui.theme.PracticeTheme
@@ -64,8 +65,8 @@ import kotlinx.coroutines.delay
 
 private val FieldErrorRed = Color(0xFFFF5252)
 
-// Breakpoints for adapting padding/type to phone width — same pattern used
-// on FeaturesScreen and NameScreen, so all onboarding screens scale consistently.
+// Typography and input sizes adapt to screen width; every onboarding page
+// shares AppPageHorizontalMargin for a consistent outer gutter.
 private data class ScreenTimeScreenDimens(
     val horizontalPadding: Dp,
     val headingSize: TextUnit,
@@ -77,7 +78,7 @@ private data class ScreenTimeScreenDimens(
 
 private fun screenTimeDimensFor(maxWidth: Dp): ScreenTimeScreenDimens = when {
     maxWidth < 340.dp -> ScreenTimeScreenDimens(
-        horizontalPadding = 20.dp,
+        horizontalPadding = AppPageHorizontalMargin,
         headingSize = 26.sp,
         buttonFontSize = 16.sp,
         timeBoxHeight = 68.dp,
@@ -85,7 +86,7 @@ private fun screenTimeDimensFor(maxWidth: Dp): ScreenTimeScreenDimens = when {
         colonFontSize = 24.sp
     )
     maxWidth < 400.dp -> ScreenTimeScreenDimens(
-        horizontalPadding = 28.dp,
+        horizontalPadding = AppPageHorizontalMargin,
         headingSize = 28.sp,
         buttonFontSize = 17.sp,
         timeBoxHeight = 74.dp,
@@ -93,7 +94,7 @@ private fun screenTimeDimensFor(maxWidth: Dp): ScreenTimeScreenDimens = when {
         colonFontSize = 26.sp
     )
     maxWidth < 600.dp -> ScreenTimeScreenDimens(
-        horizontalPadding = 40.dp,
+        horizontalPadding = AppPageHorizontalMargin,
         headingSize = 30.sp,
         buttonFontSize = 18.sp,
         timeBoxHeight = 80.dp,
@@ -101,7 +102,7 @@ private fun screenTimeDimensFor(maxWidth: Dp): ScreenTimeScreenDimens = when {
         colonFontSize = 28.sp
     )
     else -> ScreenTimeScreenDimens( // tablets / large-screen devices
-        horizontalPadding = 64.dp,
+        horizontalPadding = AppPageHorizontalMargin,
         headingSize = 36.sp,
         buttonFontSize = 20.sp,
         timeBoxHeight = 92.dp,
@@ -117,6 +118,49 @@ fun ScreenTimeScreen(
     minutes: String = "",
     onMinutesChange: (String) -> Unit = {},
     onNext: (hours: String, minutes: String) -> Unit = { _, _ -> }
+) {
+    DurationInputScreen(
+        title = "What's your average\nscreen time",
+        orangeProgressWeight = 2f,
+        whiteProgressWeight = 2f,
+        hours = hours,
+        onHoursChange = onHoursChange,
+        minutes = minutes,
+        onMinutesChange = onMinutesChange,
+        onNext = onNext
+    )
+}
+
+@Composable
+fun AverageAppSessionScreen(
+    hours: String = "",
+    onHoursChange: (String) -> Unit = {},
+    minutes: String = "",
+    onMinutesChange: (String) -> Unit = {},
+    onNext: (hours: String, minutes: String) -> Unit = { _, _ -> }
+) {
+    DurationInputScreen(
+        title = "On average, how long do you spend on an app after opening it?",
+        orangeProgressWeight = 3f,
+        whiteProgressWeight = 1f,
+        hours = hours,
+        onHoursChange = onHoursChange,
+        minutes = minutes,
+        onMinutesChange = onMinutesChange,
+        onNext = onNext
+    )
+}
+
+@Composable
+private fun DurationInputScreen(
+    title: String,
+    orangeProgressWeight: Float,
+    whiteProgressWeight: Float,
+    hours: String,
+    onHoursChange: (String) -> Unit,
+    minutes: String,
+    onMinutesChange: (String) -> Unit,
+    onNext: (hours: String, minutes: String) -> Unit
 ) {
 
     var errorMessage by remember {
@@ -153,6 +197,7 @@ fun ScreenTimeScreen(
             .navigationBarsPadding()
     ) {
         val dimens = screenTimeDimensFor(maxWidth)
+        val headingSize = dimens.headingSize
         val contentMaxWidth = if (maxWidth > 600.dp) 480.dp else maxWidth
 
         Image(
@@ -170,10 +215,10 @@ fun ScreenTimeScreen(
         ) {
 
             Text(
-                text = "What's your average screen time",
+                text = title,
                 color = DescintWhite,
                 fontFamily = albertsans,
-                fontSize = dimens.headingSize,
+                fontSize = headingSize,
                 fontWeight = FontWeight.Light,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
@@ -330,14 +375,14 @@ fun ScreenTimeScreen(
             ) {
                 Box(
                     modifier = Modifier
-                        .weight(2f)
+                        .weight(orangeProgressWeight)
                         .height(4.dp)
                         .background(DescintOrange)
                 )
 
                 Box(
                     modifier = Modifier
-                        .weight(1f)
+                        .weight(whiteProgressWeight)
                         .height(4.dp)
                         .background(DescintWhite)
                 )
@@ -406,6 +451,14 @@ private fun TimeUnitBox(
             interactionSource = interactionSource,
             modifier = Modifier.fillMaxWidth()
         )
+    }
+}
+
+@Preview(showBackground = true, widthDp = 411, heightDp = 891, name = "Average app session")
+@Composable
+fun AverageAppSessionScreenPreview() {
+    PracticeTheme {
+        AverageAppSessionScreen()
     }
 }
 

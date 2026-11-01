@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import com.example.practice.R
+import com.example.practice.ui.theme.AppPageHorizontalMargin
 import com.example.practice.ui.theme.DescintOrange
 import com.example.practice.ui.theme.DescintWhite
 import com.example.practice.ui.theme.PracticeTheme
@@ -77,22 +78,22 @@ private fun nameDimensFor(maxWidth: Dp): NameScreenDimens {
     val buttonFontSize: TextUnit
 
     if (maxWidth < 340.dp) {
-        horizontalPadding = 20.dp
+        horizontalPadding = AppPageHorizontalMargin
         headingSize = 26.sp
         inputFontSize = 17.sp
         buttonFontSize = 16.sp
     } else if (maxWidth < 400.dp) {
-        horizontalPadding = 28.dp
+        horizontalPadding = AppPageHorizontalMargin
         headingSize = 28.sp
         inputFontSize = 18.sp
         buttonFontSize = 17.sp
     } else if (maxWidth < 600.dp) {
-        horizontalPadding = 40.dp
+        horizontalPadding = AppPageHorizontalMargin
         headingSize = 30.sp
         inputFontSize = 20.sp
         buttonFontSize = 18.sp
     } else {
-        horizontalPadding = 64.dp
+        horizontalPadding = AppPageHorizontalMargin
         headingSize = 36.sp
         inputFontSize = 22.sp
         buttonFontSize = 20.sp
@@ -106,6 +107,13 @@ private fun nameDimensFor(maxWidth: Dp): NameScreenDimens {
     )
 }
 
+private val disallowedNameCharacters = Regex("[^\\p{L}\\p{M} ]")
+private val repeatedNameSpaces = Regex(" {2,}")
+
+private fun sanitizeName(name: String): String = name
+    .replace(disallowedNameCharacters, "")
+    .replace(repeatedNameSpaces, " ")
+
 @Composable
 fun NameScreen(
     name: String = "",
@@ -115,6 +123,9 @@ fun NameScreen(
 
     var errorMessage by remember {
         mutableStateOf<String?>(null)
+    }
+    var isNameInvalid by remember {
+        mutableStateOf(false)
     }
 
     LaunchedEffect(errorMessage) {
@@ -229,7 +240,7 @@ fun NameScreen(
             }
 
             // Expanded color selection into a readable if-else block
-            val targetBorderColor = if (errorMessage != null) {
+            val targetBorderColor = if (isNameInvalid || errorMessage != null) {
                 FieldErrorRed
             } else if (isTextFieldFocused) {
                 DescintOrange
@@ -272,11 +283,12 @@ fun NameScreen(
                 BasicTextField(
                     value = name,
                     onValueChange = { newValue ->
-                        // Broke down the string filter into clear steps
-                        val filteredValue = newValue
-                            .filter { char -> char.isLetter() || char == ' ' }
-                            .replace(Regex(" {2,}"), " ")
+                        val filteredValue = sanitizeName(newValue)
 
+                        if (filteredValue.isNotBlank()) {
+                            isNameInvalid = false
+                            errorMessage = null
+                        }
                         onNameChange(filteredValue)
                     },
                     singleLine = true,
@@ -302,15 +314,16 @@ fun NameScreen(
                 onClick = {
                     focusManager.clearFocus()
 
-                    val isBlank = name.isBlank()
-                    val hasDigit = name.any { char -> char.isDigit() }
+                    val cleanedName = sanitizeName(name).trim()
 
-                    if (isBlank) {
+                    if (cleanedName.isEmpty()) {
+                        isNameInvalid = true
                         errorMessage = "This field is necessary"
-                    } else if (hasDigit) {
-                        errorMessage = "Invalid username"
                     } else {
-                        onNext(name)
+                        isNameInvalid = false
+                        errorMessage = null
+                        if (cleanedName != name) onNameChange(cleanedName)
+                        onNext(cleanedName)
                     }
                 },
                 interactionSource = buttonInteractionSource,
@@ -350,7 +363,7 @@ fun NameScreen(
 
                 Box(
                     modifier = Modifier
-                        .weight(2f)
+                        .weight(3f)
                         .height(4.dp)
                         .background(DescintWhite)
                 )

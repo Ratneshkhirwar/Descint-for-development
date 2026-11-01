@@ -1,50 +1,70 @@
 package com.example.practice.ui.home
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
-import androidx.compose.ui.res.painterResource
-import com.example.practice.R
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.practice.R
+import com.example.practice.data.DailyGoal
+import com.example.practice.data.DailyGoalProgress
 import com.example.practice.data.UserData
 import com.example.practice.data.UserPreferencesRepository
+import com.example.practice.ui.theme.AppPageHorizontalMargin
 import com.example.practice.ui.theme.DescintBlack
 import com.example.practice.ui.theme.DescintWhite
 import com.example.practice.ui.theme.PracticeTheme
 import com.example.practice.ui.theme.albertsans
 import com.example.practice.ui.theme.inter
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.util.Calendar
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 
 // Rotates to the next one every 24 hours (see UserPreferencesRepository.getRotatingQuote).
 // Add/reorder freely — the stored index just wraps to list size.
@@ -85,18 +105,34 @@ private val homeQuotes = listOf(
 fun HomeScreen() {
     val context = LocalContext.current
     val repository = remember { UserPreferencesRepository(context) }
-
+    val coroutineScope = rememberCoroutineScope()
     val userData by repository.userDataFlow.collectAsState(initial = UserData())
 
     var quote by remember { mutableStateOf("") }
+    var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
         quote = repository.getRotatingQuote(homeQuotes)
+        while (true) {
+            nowMillis = System.currentTimeMillis()
+            delay(1000L)
+        }
     }
 
-    val today = remember { Calendar.getInstance() }
-    val todayDateKey = remember { dateKeyFor(today) }
-    val todayStartMillis = remember { startOfDayMillis(today) }
-    val cells = remember { buildMonthGrid(today) }
+    var goals by remember { mutableStateOf(userData.dailyGoals) }
+    LaunchedEffect(userData.dailyGoals) {
+        goals = userData.dailyGoals
+    }
+
+    var selectedTab by rememberSaveable { mutableStateOf(HomeTab.HOME) }
+    var showAddGoal by rememberSaveable { mutableStateOf(false) }
+
+    val today = Calendar.getInstance().apply { timeInMillis = nowMillis }
+    val todayDateKey = dateKeyFor(today)
+    val todayStartMillis = remember(todayDateKey) { startOfDayMillis(today) }
+    val todayDayIndex = (today.get(Calendar.DAY_OF_WEEK) + 5) % 7 // Monday=0 ... Sunday=6
+    val cells = remember(today.get(Calendar.YEAR), today.get(Calendar.MONTH)) {
+        buildMonthGrid(today)
+    }
 
     val onboardingStartDateKey = if (userData.onboardingCompletedAtMillis > 0L) {
         dateKeyFromMillis(userData.onboardingCompletedAtMillis)
@@ -104,8 +140,26 @@ fun HomeScreen() {
         null
     }
 
-    val streak = remember(userData.completedDates) {
+    val streak = remember(userData.completedDates, todayDateKey) {
         calculateStreak(userData.completedDates, today)
+    }
+
+    fun persistGoals(updatedGoals: List<DailyGoal>) {
+        goals = updatedGoals
+        val anyGoalCompletionCreditedToday = updatedGoals.any { goal ->
+            todayDayIndex in goal.repeatDays && goal.progressFor(todayDateKey).completionCredited
+        }
+        coroutineScope.launch {
+            repository.saveDailyGoals(updatedGoals)
+            repository.setDateCompleted(todayDateKey, anyGoalCompletionCreditedToday)
+        }
+    }
+
+    fun updateGoalProgress(goal: DailyGoal, progress: DailyGoalProgress) {
+        val updatedGoals = goals.map { current ->
+            if (current.id == goal.id) current.withProgress(todayDateKey, progress) else current
+        }
+        persistGoals(updatedGoals)
     }
 
     Box(
@@ -113,37 +167,138 @@ fun HomeScreen() {
             .fillMaxSize()
             .background(DescintBlack)
     ) {
-        Column(
+        AnimatedContent(
+            targetState = selectedTab,
+            modifier = Modifier.fillMaxSize(),
+            transitionSpec = {
+                (fadeIn(tween(230)) +
+                    slideInVertically(tween(270, easing = FastOutSlowInEasing)) { height -> height / 36 }) togetherWith
+                    (fadeOut(tween(170)) +
+                        slideOutVertically(tween(220, easing = FastOutSlowInEasing)) { height -> -height / 36 })
+            },
+            label = "homeTabContent"
+        ) { destination ->
+            when (destination) {
+                HomeTab.HOME -> Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = AppPageHorizontalMargin)
+                        .padding(top = 60.dp, bottom = 116.dp)
+                ) {
+                    HomeHeader(
+                        name = userData.name,
+                        quote = quote,
+                        onPanelClick = { /* TODO: open panel */ }
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // The existing streak calendar and its implementation are intentionally unchanged.
+                    StreakCalendarCard(
+                        streakDays = streak,
+                        cells = cells,
+                        dayStateFor = { cell ->
+                            resolveDayState(
+                                cell = cell,
+                                completedDates = userData.completedDates,
+                                onboardingStartDateKey = onboardingStartDateKey,
+                                todayDateKey = todayDateKey,
+                                todayStartMillis = todayStartMillis,
+                                cellStartMillis = parseDateKeyToStartMillis(cell.dateKey)
+                            )
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(38.dp))
+
+                    DailyGoalsSection(
+                        goals = goals,
+                        dateKey = todayDateKey,
+                        dayIndex = todayDayIndex,
+                        nowMillis = nowMillis,
+                        onProgressChange = ::updateGoalProgress,
+                        onDelete = { goal -> persistGoals(goals.filterNot { it.id == goal.id }) },
+                        onAddClick = { showAddGoal = true }
+                    )
+
+                    Spacer(modifier = Modifier.height(34.dp))
+                }
+
+                HomeTab.CALENDAR -> ProductivityCalendarScreen(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(bottom = 94.dp)
+                )
+
+                else -> PlaceholderTabScreen(
+                    tab = destination,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(bottom = 94.dp)
+                )
+            }
+        }
+
+        AnimatedVisibility(
+            visible = selectedTab == HomeTab.HOME,
             modifier = Modifier
-                .fillMaxSize()
+                .align(Alignment.BottomEnd)
                 .navigationBarsPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp)
-                .padding(top = 60.dp)
+                .padding(end = AppPageHorizontalMargin, bottom = 74.dp),
+            enter = fadeIn(tween(180)) + scaleIn(animationSpec = tween(220, easing = FastOutSlowInEasing), initialScale = 0.78f),
+            exit = fadeOut(tween(140)) + scaleOut(animationSpec = tween(160), targetScale = 0.82f)
         ) {
-            HomeHeader(
-                name = userData.name,
-                quote = quote,
-                onPanelClick = { /* TODO: open panel */ }
-            )
+            HomeAddGoalButton(onClick = { showAddGoal = true })
+        }
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            StreakCalendarCard(
-                streakDays = streak,
-                cells = cells,
-                dayStateFor = { cell ->
-                    resolveDayState(
-                        cell = cell,
-                        completedDates = userData.completedDates,
-                        onboardingStartDateKey = onboardingStartDateKey,
-                        todayDateKey = todayDateKey,
-                        todayStartMillis = todayStartMillis,
-                        cellStartMillis = parseDateKeyToStartMillis(cell.dateKey)
+        val addGoalSheetVisible = showAddGoal && selectedTab == HomeTab.HOME
+        AnimatedVisibility(
+            visible = addGoalSheetVisible,
+            modifier = Modifier.fillMaxSize(),
+            enter = fadeIn(tween(220)),
+            exit = fadeOut(tween(180))
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                AddGoalScrim(
+                    onDismiss = { showAddGoal = false },
+                    modifier = Modifier.fillMaxSize()
+                )
+                AnimatedVisibility(
+                    visible = addGoalSheetVisible,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.88f),
+                    enter = slideInVertically(
+                        animationSpec = tween(320, easing = FastOutSlowInEasing)
+                    ) { fullHeight -> fullHeight },
+                    exit = slideOutVertically(
+                        animationSpec = tween(250, easing = FastOutSlowInEasing)
+                    ) { fullHeight -> fullHeight }
+                ) {
+                    AddDailyGoalSheet(
+                        onClose = { showAddGoal = false },
+                        onSave = { goal ->
+                            persistGoals(goals + goal)
+                            showAddGoal = false
+                        },
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
-            )
+            }
         }
+
+        HomeBottomNavigation(
+            selectedTab = selectedTab,
+            onSelectTab = { tab ->
+                selectedTab = tab
+                if (tab != HomeTab.HOME) showAddGoal = false
+            },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+        )
     }
 }
 
