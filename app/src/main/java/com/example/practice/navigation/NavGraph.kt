@@ -26,6 +26,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.practice.data.UserPreferencesRepository
 import com.example.practice.ui.home.HomeScreen
+import com.example.practice.ui.onboarding.AverageAppSessionScreen
 import com.example.practice.ui.onboarding.FeaturesScreen
 import com.example.practice.ui.onboarding.NameScreen
 import com.example.practice.ui.onboarding.ScreenTimeScreen
@@ -39,6 +40,7 @@ private object Routes {
     const val WELCOME = "welcome"
     const val NAME = "name"
     const val SCREEN_TIME = "screen_time"
+    const val AVERAGE_APP_SESSION = "average_app_session"
     const val FEATURES = "features"
     const val SPLASH = "splash"
     const val HOME = "home"
@@ -104,6 +106,8 @@ fun NavGraph() {
     var draftName by rememberSaveable { mutableStateOf("") }
     var draftHours by rememberSaveable { mutableStateOf("") }
     var draftMinutes by rememberSaveable { mutableStateOf("") }
+    var draftAppSessionHours by rememberSaveable { mutableStateOf("") }
+    var draftAppSessionMinutes by rememberSaveable { mutableStateOf("") }
 
     NavHost(
         navController = navController,
@@ -159,6 +163,31 @@ fun NavGraph() {
                 onNext = { hours, minutes ->
                     coroutineScope.launch {
                         repository.saveScreenTime(
+                            hours = hours.toIntOrNull() ?: 0,
+                            minutes = minutes.toIntOrNull() ?: 0
+                        )
+                    }
+                    navController.navigate(Routes.AVERAGE_APP_SESSION)
+                }
+            )
+        }
+
+        // AVERAGE APP SESSION
+        composable(
+            route = Routes.AVERAGE_APP_SESSION,
+            enterTransition = slideInRight,
+            exitTransition = slideOutLeft,
+            popEnterTransition = slideInLeft,
+            popExitTransition = slideOutRight
+        ) {
+            AverageAppSessionScreen(
+                hours = draftAppSessionHours,
+                onHoursChange = { draftAppSessionHours = it },
+                minutes = draftAppSessionMinutes,
+                onMinutesChange = { draftAppSessionMinutes = it },
+                onNext = { hours, minutes ->
+                    coroutineScope.launch {
+                        repository.saveAverageAppSessionTime(
                             hours = hours.toIntOrNull() ?: 0,
                             minutes = minutes.toIntOrNull() ?: 0
                         )

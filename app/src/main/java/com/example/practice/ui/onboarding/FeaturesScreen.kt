@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.practice.R
+import com.example.practice.ui.theme.AppPageHorizontalMargin
 import com.example.practice.ui.theme.DescintOrange
 import com.example.practice.ui.theme.DescintWhite
 import com.example.practice.ui.theme.PracticeTheme
@@ -59,9 +60,8 @@ private val features = listOf(
     Feature(4, "Limit your screen time")
 )
 
-// Breakpoints for adapting padding/type to phone width. Everything below is
-// derived from the available width at runtime via BoxWithConstraints, so this
-// scales smoothly across small phones, large phones, and tablets/foldables.
+// Typography and badge sizes adapt to available width; page-level horizontal
+// spacing comes from the shared AppPageHorizontalMargin token.
 private data class FeaturesScreenDimens(
     val horizontalPadding: Dp,
     val headingSize: TextUnit,
@@ -71,25 +71,25 @@ private data class FeaturesScreenDimens(
 
 private fun featuresDimensFor(maxWidth: Dp): FeaturesScreenDimens = when {
     maxWidth < 340.dp -> FeaturesScreenDimens(
-        horizontalPadding = 20.dp,
+        horizontalPadding = AppPageHorizontalMargin,
         headingSize = 28.sp,
         bodySize = 13.sp,
         badgeSize = 24.dp
     )
     maxWidth < 400.dp -> FeaturesScreenDimens(
-        horizontalPadding = 28.dp,
+        horizontalPadding = AppPageHorizontalMargin,
         headingSize = 31.sp,
         bodySize = 13.5.sp,
         badgeSize = 26.dp
     )
     maxWidth < 600.dp -> FeaturesScreenDimens(
-        horizontalPadding = 40.dp,
+        horizontalPadding = AppPageHorizontalMargin,
         headingSize = 34.sp,
         bodySize = 14.sp,
         badgeSize = 28.dp
     )
     else -> FeaturesScreenDimens( // tablets / large-screen devices
-        horizontalPadding = 64.dp,
+        horizontalPadding = AppPageHorizontalMargin,
         headingSize = 40.sp,
         bodySize = 16.sp,
         badgeSize = 32.dp

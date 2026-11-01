@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.practice.ui.theme.AppPageHorizontalMargin
 import com.example.practice.ui.theme.Jura
 import com.example.practice.ui.theme.albertsans
 import com.example.practice.ui.theme.inter
@@ -39,7 +40,7 @@ fun WelcomeScreen() {
         Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 40.dp)
+                    .padding(horizontal = AppPageHorizontalMargin)
                     .navigationBarsPadding()
                 ) {
             Text(

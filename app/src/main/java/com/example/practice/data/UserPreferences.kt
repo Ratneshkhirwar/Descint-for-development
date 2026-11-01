@@ -19,6 +19,8 @@ data class UserData(
     val name: String = "",
     val screenTimeHours: Int = 0,
     val screenTimeMinutes: Int = 0,
+    val averageAppSessionHours: Int = 0,
+    val averageAppSessionMinutes: Int = 0,
     val blockedApps: Set<String> = emptySet(), // app package names, e.g. "com.instagram.android"
     // Epoch millis of the moment the user finished onboarding (Features screen
     // "Continue"). 0L means onboarding hasn't been completed yet. Used to tell
@@ -28,7 +30,9 @@ data class UserData(
     val onboardingCompletedAtMillis: Long = 0L,
     // Dates (as "yyyy-MM-dd") on which the user completed at least one task.
     // Presence in the set = completed that day; absence = not completed.
-    val completedDates: Set<String> = emptySet()
+    val completedDates: Set<String> = emptySet(),
+    val dailyGoals: List<DailyGoal> = emptyList(),
+    val productivityCalendar: ProductivityCalendarData = ProductivityCalendarData()
 )
 
 class UserPreferencesRepository(private val context: Context) {
@@ -37,11 +41,15 @@ class UserPreferencesRepository(private val context: Context) {
         val NAME = stringPreferencesKey("user_name")
         val SCREEN_TIME_HOURS = intPreferencesKey("screen_time_hours")
         val SCREEN_TIME_MINUTES = intPreferencesKey("screen_time_minutes")
+        val AVERAGE_APP_SESSION_HOURS = intPreferencesKey("average_app_session_hours")
+        val AVERAGE_APP_SESSION_MINUTES = intPreferencesKey("average_app_session_minutes")
         val BLOCKED_APPS = stringSetPreferencesKey("blocked_apps")
         val QUOTE_INDEX = intPreferencesKey("quote_index")
         val QUOTE_LAST_ROTATED_AT = longPreferencesKey("quote_last_rotated_at")
         val ONBOARDING_COMPLETED_AT = longPreferencesKey("onboarding_completed_at")
         val COMPLETED_DATES = stringSetPreferencesKey("completed_task_dates")
+        val DAILY_GOALS = stringPreferencesKey("daily_goals_json")
+        val PRODUCTIVITY_CALENDAR = stringPreferencesKey("productivity_calendar_json")
     }
 
     val userDataFlow: Flow<UserData> = context.dataStore.data.map { prefs ->
@@ -49,9 +57,15 @@ class UserPreferencesRepository(private val context: Context) {
             name = prefs[Keys.NAME] ?: "",
             screenTimeHours = prefs[Keys.SCREEN_TIME_HOURS] ?: 0,
             screenTimeMinutes = prefs[Keys.SCREEN_TIME_MINUTES] ?: 0,
+            averageAppSessionHours = prefs[Keys.AVERAGE_APP_SESSION_HOURS] ?: 0,
+            averageAppSessionMinutes = prefs[Keys.AVERAGE_APP_SESSION_MINUTES] ?: 0,
             blockedApps = prefs[Keys.BLOCKED_APPS] ?: emptySet(),
             onboardingCompletedAtMillis = prefs[Keys.ONBOARDING_COMPLETED_AT] ?: 0L,
-            completedDates = prefs[Keys.COMPLETED_DATES] ?: emptySet()
+            completedDates = prefs[Keys.COMPLETED_DATES] ?: emptySet(),
+            dailyGoals = DailyGoalJson.decode(prefs[Keys.DAILY_GOALS] ?: "[]"),
+            productivityCalendar = ProductivityCalendarJson.decode(
+                prefs[Keys.PRODUCTIVITY_CALENDAR] ?: "{}"
+            )
         )
     }
 
@@ -65,6 +79,13 @@ class UserPreferencesRepository(private val context: Context) {
         context.dataStore.edit { prefs ->
             prefs[Keys.SCREEN_TIME_HOURS] = hours
             prefs[Keys.SCREEN_TIME_MINUTES] = minutes
+        }
+    }
+
+    suspend fun saveAverageAppSessionTime(hours: Int, minutes: Int) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.AVERAGE_APP_SESSION_HOURS] = hours
+            prefs[Keys.AVERAGE_APP_SESSION_MINUTES] = minutes
         }
     }
 
@@ -85,6 +106,18 @@ class UserPreferencesRepository(private val context: Context) {
         context.dataStore.edit { prefs ->
             val current = prefs[Keys.BLOCKED_APPS] ?: emptySet()
             prefs[Keys.BLOCKED_APPS] = current - packageName
+        }
+    }
+
+    suspend fun saveDailyGoals(goals: List<DailyGoal>) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.DAILY_GOALS] = DailyGoalJson.encode(goals)
+        }
+    }
+
+    suspend fun saveProductivityCalendar(data: ProductivityCalendarData) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.PRODUCTIVITY_CALENDAR] = ProductivityCalendarJson.encode(data)
         }
     }
 
